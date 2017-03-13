@@ -13,13 +13,13 @@ var request = require('request');
 var cheerio = require('cheerio');
 var async = require('async');
 
-const URL = 'https://newjersey.craigslist.org/search/fgs'; 		// The webpage to scrape
+const URL = 'https://newjersey.craigslist.org/search/fgs'; 
 const base_url = 'https://newjersey.craigslist.org';
 
 var total_count;
 var count = 0;
 var json = [];
-var config_json = {};
+var config_json = [];
 
 scrape_data(URL, function (err) {
 	if (err) {
@@ -30,29 +30,32 @@ scrape_data(URL, function (err) {
 	fs.writeFile('output.json', JSON.stringify(json, null, 4), function(err){
 
 		console.log('File successfully written! - Check your project directory for the output.json file');
+		
 	})
+	
 	fs.writeFile('config.json', JSON.stringify(config_json, null, 4), function(err){
 
 		console.log('File successfully written! - Check your project directory for the output.json file');
+		
 	})
 });
 
 function get_urls_by_page(url, next) {
-
+	
 	var options = {
         url: url,
-        // ca: fs.readFileSync("crawlera-ca.crt"),
-        // requestCert: true,
-        // rejectUnauthorized: true
+        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
+        requestCert: true,
+        rejectUnauthorized: true
     };
 
-    // var new_req = request.defaults({
-    //     'proxy': 'http://<API KEY>:@proxy.crawlera.com:8010'
-    // });
+    var new_req = request.defaults({
+        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
+    });
 
-	request(options, function(error, response, html){
+	new_req(options, function(error, response, html){
 		if (error || response.statusCode != 200) {
-			console.log('Error:' );
+			console.log('Error:' + error);
 			process.exit(0);
 		}
 		var $ = cheerio.load(html);
@@ -79,7 +82,18 @@ function get_urls_by_page(url, next) {
 
 function get_infor_by_page(next) {
 	var get_data = async.queue(function(task, callback) {
-		request(json[task.idx]['url'], function(err, response, html) {
+		var options = {
+	        url: json[task.idx]['url'],
+	        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
+	        requestCert: true,
+	        rejectUnauthorized: true
+	    };
+	
+	    var new_req = request.defaults({
+	        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
+	    });
+	
+		new_req(options, function(err, response, html) {
 			console.log("callback" + task.idx + "*******************");
 			var $ = cheerio.load(html);
 
@@ -89,7 +103,19 @@ function get_infor_by_page(next) {
 			json[task.idx]['data_latitude'] = $('#map').attr('data-latitude');
 			json[task.idx]['data_longitude'] = $('#map').attr('data-longitude');
 			reply_url = base_url + "/reply/njy" + json[task.idx]['url'].replace(base_url, '').replace('.html', '');
-			request(url=reply_url, function(error,reponse, body) {
+			
+			var options = {
+		        url: reply_url,
+		        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
+		        requestCert: true,
+		        rejectUnauthorized: true
+		    };
+		
+		    var new_req = request.defaults({
+		        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
+		    });
+		
+			new_req(options, function(error,reponse, body) {
 				var $ = cheerio.load(reponse.body);
 				$('.reply-tel-number').html() == null? json[task.idx]['reply_phone_number'] = 'NA':json[task.idx]['reply_phone_number'] = $('.reply-tel-number').html().replace('\n            &#x260E; ', '').replace('\n        ', '');
 				$('.reply-email-address a').html() == null? json[task.idx]['reply_email'] = 'NA':json[task.idx]['reply_email'] = $('.reply-email-address a').html();
