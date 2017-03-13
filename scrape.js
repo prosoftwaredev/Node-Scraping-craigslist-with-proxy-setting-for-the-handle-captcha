@@ -38,17 +38,19 @@ scrape_data(URL, function (err) {
 });
 
 function get_urls_by_page(url, next) {
-	let options = {
-		url: url,
-		proxy: 'http://myproxy.com'
-		// header: {
-		// 	'Content-Type': 'text/html; charset=UTF-8',
-		// 	'Cookie': 'cl_b=rH_FSAoF5xGU0KMX2pglWgtLtJc; cl_tocmode=bbb%3Alist',
-		// 	'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
-		// }
-	};
 
-	request(url, function(error, response, html){
+	var options = {
+        url: url,
+        // ca: fs.readFileSync("crawlera-ca.crt"),
+        // requestCert: true,
+        // rejectUnauthorized: true
+    };
+
+    // var new_req = request.defaults({
+    //     'proxy': 'http://<API KEY>:@proxy.crawlera.com:8010'
+    // });
+
+	request(options, function(error, response, html){
 		if (error || response.statusCode != 200) {
 			console.log('Error:' );
 			process.exit(0);
