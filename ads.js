@@ -1,14 +1,5 @@
 module.exports = [
     {
-        "url": "https://newjersey.craigslist.org/fgs/6020425040.html",
-        "date_of_posting": "2017-02-26T10:42:25-0500",
-        "title_of_post": "BLUE SPRUCE TREE CO.  #*#*#* WE WILL BEAT ANY PRICE *#*#*#",
-        "body_of_text": "                    QR Code Link to This Post                    WE DO : TREE REMOVALS, TREE PRUNING, TREE PLANTING, STUMP GRINDING, MULCHING, WOODCHIPS, POWER WASHING, CARPENTRY, WOOD REMOVAL, & JUST ABOUT ANY TYPE OF DEBRIS REMOVAL !!!27 YEARS IN THE BUSINESS *****LICENSED & INSURED *****PLEASE CONTACT ****MICHAEL  show contact info    ",
-        "reply_phone_number": "NA",
-        "reply_email": "NA",
-        "phone_type": "NA"
-    },
-    {
         "url": "https://newjersey.craigslist.org/fgs/6042351192.html",
         "date_of_posting": "2017-03-13T14:12:56-0400",
         "title_of_post": "Winter storm heading our way",
@@ -26,8 +17,8 @@ module.exports = [
         "body_of_text": "                    QR Code Link to This Post                    $40 per yard installed for hardwood mulch$50 per yard installed for colored mulch$20 per yard delivered hardwood mulch$30 per yard delivered colored mulcheswww.mountainviewmulchservices.com    ",
         "data_latitude": "40.927700",
         "data_longitude": "-74.342800",
-        "reply_phone_number": "NA",
+        "reply_phone_number": "",
         "reply_email": "fsvgr-6014595488@serv.craigslist.org",
-        "phone_type": "NA"
+        "phone_type": ""
     }
 ]
