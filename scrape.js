@@ -12,156 +12,237 @@ var fs      = require('fs');
 var request = require('request');
 var cheerio = require('cheerio');
 var async = require('async');
+var config = require('./config.js');
 
-const URL = 'https://newjersey.craigslist.org/search/fgs'; 
-const base_url = 'https://newjersey.craigslist.org';
+async.each(config, eachUrl,
+	function(err) {
+		if (err) {
+			console.log(err);
+		}
+		else {
+			console.log('OK');
+		}
+})
 
-var total_count;
-var count = 0;
-var json = [];
-var config_json = [];
+function eachUrl(url, callback) {
 
-scrape_data(URL, function (err) {
-	if (err) {
-		console.log(err);
-		process.exit(0);
+	const URL = url.url;
+
+	var search_text = URL.substr(URL.indexOf("search/") + 7);
+
+	const base_url = URL.replace('/search/', '').replace(search_text, '');
+
+	const city_name = base_url.replace('https://', '').replace('.craigslist.org', '');
+
+	var total_count;
+	var count = 0;
+	var json = [];
+	var config_json = [];
+	var download_dir_init = './download';
+
+	if(!fs.existsSync(download_dir_init)){
+		fs.mkdir(download_dir_init);
 	}
 
-	fs.writeFile('output.json', JSON.stringify(json, null, 4), function(err){
+	var city_dir = './download' + '/' + city_name;
 
-		console.log('File successfully written! - Check your project directory for the output.json file');
-		
-	})
-	
-	fs.writeFile('config.json', JSON.stringify(config_json, null, 4), function(err){
+	if (!fs.existsSync(city_dir)){
+	    fs.mkdirSync(city_dir);
+	}
 
-		console.log('File successfully written! - Check your project directory for the output.json file');
-		
-	})
-});
+	var download_dir = './download' + '/' + city_name + '/' + search_text.replace('/', '');
 
-function get_urls_by_page(url, next) {
-	
-	var options = {
-        url: url,
-        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
-        requestCert: true,
-        rejectUnauthorized: true
-    };
+	if (!fs.existsSync(download_dir)){
+	    fs.mkdirSync(download_dir);
+	}
 
-    var new_req = request.defaults({
-        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
-    });
-
-	new_req(options, function(error, response, html){
-		if (error || response.statusCode != 200) {
-			console.log('Error:' + error);
+	scrape_data(URL, function (err) {
+		if (err) {
+			console.log(err);
 			process.exit(0);
 		}
-		var $ = cheerio.load(html);
-		if (count == 0) {
-			total_count = $('.totalcount').eq(0).text();
-		}
-
-		$('ul.rows li p a.result-title').each(function(i, elm){
-			var url = $(this).attr('href');
-
-			if (url !== undefined){
-				config_json[count] = {};
-				json[count] = {};
-				config_json[count] = base_url + url;
-				json[count]['url'] = base_url + url;
-				count++;
-			}
-
-		});
-		next(null);
 	});
-}
 
+	function get_urls_by_page(url, next) {
 
-function get_infor_by_page(next) {
-	var get_data = async.queue(function(task, callback) {
 		var options = {
-	        url: json[task.idx]['url'],
+	        url: url,
 	        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
 	        requestCert: true,
 	        rejectUnauthorized: true
 	    };
-	
+
 	    var new_req = request.defaults({
 	        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
 	    });
-	
-		new_req(options, function(err, response, html) {
-			console.log("callback" + task.idx + "*******************");
-			var $ = cheerio.load(html);
 
-			json[task.idx]['date_of_posting'] = $('div.postinginfos').find('.postinginfo').eq(1).find('time').attr('datetime');
-			json[task.idx]['title_of_post'] = $('.postingtitletext #titletextonly').text();
-			json[task.idx]['body_of_text'] = $('#postingbody').text().replace(/\n/g,'');
-			json[task.idx]['data_latitude'] = $('#map').attr('data-latitude');
-			json[task.idx]['data_longitude'] = $('#map').attr('data-longitude');
-			reply_url = base_url + "/reply/njy" + json[task.idx]['url'].replace(base_url, '').replace('.html', '');
-			
+		new_req(options, function(error, response, html){
+			if (error || response.statusCode != 200) {
+				console.log('Error:' + error);
+				process.exit(0);
+			}
+			var $ = cheerio.load(html);
+			if (count == 0) {
+				total_count = $('.totalcount').eq(0).text();
+			}
+
+			$('ul.rows li p a.result-title').each(function(i, elm){
+				var url = $(this).attr('href');
+
+				if (url !== undefined){
+					config_json[count] = {};
+					json[count] = {};
+					config_json[count] = base_url + url;
+					json[count]['url'] = base_url + url;
+					count++;
+				}
+
+			});
+			next(null);
+		});
+	}
+
+
+	function get_infor_by_page(next) {
+		var get_data = async.queue(function(task, callback) {
 			var options = {
-		        url: reply_url,
+		        url: json[task.idx]['url'],
 		        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
 		        requestCert: true,
 		        rejectUnauthorized: true
 		    };
-		
+
 		    var new_req = request.defaults({
 		        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
 		    });
-		
-			new_req(options, function(error,reponse, body) {
-				var $ = cheerio.load(reponse.body);
-				$('.reply-tel-number').html() == null? json[task.idx]['reply_phone_number'] = 'NA':json[task.idx]['reply_phone_number'] = $('.reply-tel-number').html().replace('\n            &#x260E; ', '').replace('\n        ', '');
-				$('.reply-email-address a').html() == null? json[task.idx]['reply_email'] = 'NA':json[task.idx]['reply_email'] = $('.reply-email-address a').html();
-				if ($('.reply-tel-number').html() != null) {
-					json[task.idx]['phone_type'] = 'Mobile Phone';
-				} else {
-					json[task.idx]['phone_type'] = 'NA';
-				}
-				console.log('-----------------------------------------------');
-				console.log(json[task.idx]);
-				callback();
-			});
-		})
 
-	});
+			new_req(options, function(err, response, html) {
+				console.log("callback" + task.idx + "*******************");
+				var $ = cheerio.load(html);
 
-	var delta;
+				json[task.idx]['URL'] = URL;
+				json[task.idx]['date_of_scrape'] = new Date();
+				json[task.idx]['date_of_posting'] = $('div.postinginfos').find('.postinginfo').eq(1).find('time').attr('datetime');
+	            json[task.idx]['date_of_update'] = $('body > section > section > section > div.postinginfos > p:nth-child(3) > time').attr('datetime');
+				json[task.idx]['title_of_post'] = $('.postingtitletext #titletextonly').text();
+				json[task.idx]['body_of_text'] = $('#postingbody').text().replace(/\n/g,'').replace('                    QR Code Link to This Post                    ','');
+				json[task.idx]['data_latitude'] = $('#map').attr('data-latitude');
+				json[task.idx]['data_longitude'] = $('#map').attr('data-longitude');
+				json[task.idx]['first_img_url'] = $('div.swipe-wrap div.first img').attr('src');
+	            json[task.idx]['service_type'] = $('body > section > header > nav > ul > li.crumb.category > p > a').text();
+	            json[task.idx]['area'] = $('b ody > section > header > nav > ul > li.crumb.area > p > a').text();
 
-	count % 100 == 0 ? delta = 100: delta = count % 100;
-	
-	for (idx = count - delta; idx < count; idx ++) {
-		get_data.push({idx: idx}, function(err) {
-			console.log("count " + count);
+	            if(search_text.length > 4){
+
+	            	if(city_name == "newjersey") {
+	            		var reply_url = base_url + "/reply/njy" + json[task.idx]['url'].replace(base_url, '').replace(json[task.idx]['url'].replace(base_url, '').substr('/', 4)).replace('undefined', '').replace('.html', '');
+	            	} else if (city_name == "newyork") {
+	            		var reply_url = base_url + "/reply/nyc" + json[task.idx]['url'].replace(base_url, '').replace(json[task.idx]['url'].replace(base_url, '').substr('/', 4)).replace('undefined', '').replace('.html', '');
+	            	}
+
+	            } else {
+
+	            	if(city_name == "newjersey") {
+	            		var reply_url = base_url + "/reply/njy" + json[task.idx]['url'].replace(base_url, '').replace('.html', '');
+	            	} else if (city_name == "newyork") {
+	            		var reply_url = base_url + "/reply/nyc" + json[task.idx]['url'].replace(base_url, '').replace('.html', '');
+	            	}
+
+	            }
+				console.log(reply_url);
+
+				var options = {
+			        url: reply_url,
+			        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
+			        requestCert: true,
+			        rejectUnauthorized: true
+			    };
+
+			    var new_req = request.defaults({
+				        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
+			    });
+
+				new_req(options, function(error,reponse, body) {
+					var $ = cheerio.load(reponse.body);
+					$('.reply-tel-number').html() == null? json[task.idx]['reply_phone_number'] = '':json[task.idx]['reply_phone_number'] = $('.reply-tel-number').html().replace('\n            &#x260E; ', '').replace('\n        ', '').replace('\next. 201',  '');
+					$('.reply-email-address a').html() == null? json[task.idx]['reply_email'] = '':json[task.idx]['reply_email'] = $('.reply-email-address a').html();
+					if ($('.reply-tel-number').html() != null) {
+						json[task.idx]['phone_type'] = 'Mobile Phone';
+					} else {
+						json[task.idx]['phone_type'] = '';
+					}
+					console.log('-----------------------------------------------');
+					console.log(json[task.idx]);
+
+				    fs.readFile(download_dir + '/' + 'output.json', 'utf8', function readFileCallback(err, data){
+					    if (err){
+
+					    	var Json = [];
+					    	Json.push(json[task.idx]);
+					        fs.writeFile(download_dir + '/' + 'output.json', JSON.stringify(Json, null, 4), function(err){
+								console.log('File successfully written! - Check your project directory for the output.json file');
+							})
+					    } else {
+						    obj = JSON.parse(data); //now it an object
+						    for (var i = 0 ; i < obj.length ; i ++) {
+						    	if (obj[i]["url"] == json[task.idx]["url"]) {
+						    		console.log('uuuuuuuuuuuuuuuuuuuuu');
+						    		return false;
+						    	}
+						    }
+						    obj.push(json[task.idx]);
+						    // console.log(json[task.idx]);
+						    // return false; //add some data
+
+						    fs.writeFile(download_dir + '/' + 'output.json', JSON.stringify(obj, null, 4), 'utf8', function(err, data) {
+						    	if (err) {
+
+						    	}
+						    	else {
+						    		console.log(data)
+						    	}
+						    }); // write it back
+						}
+					});
+
+					callback();
+
+				});
+
+			})
+
 		});
+
+		var delta;
+
+		count % 120 == 0 ? delta = 120: delta = count % 120;
+
+		for (var idx = count - delta; idx < count; idx ++) {
+			get_data.push({idx: idx}, function(err) {
+				console.log("count " + count);
+			});
+		}
+		get_data.drain = function() {
+			next();
+		}
 	}
-	get_data.drain = function() {
-		next();
+
+	function scrape_data(url, cb){
+
+		async.waterfall([
+			function(next) {
+				next(null, url);
+			},
+			get_urls_by_page,
+			get_infor_by_page
+			], function(err) {
+				if (err) {
+					cb(err);
+				}
+				if (count >= total_count) {
+					cb(null);
+				}
+				else scrape_data(base_url+'/search/' + search_text + '?s=' + count, cb);
+			})
 	}
 }
-
-function scrape_data(url, cb){
-
-	async.waterfall([
-		function(next) {
-			next(null, url);
-		},
-		get_urls_by_page,
-		get_infor_by_page
-		], function(err) {
-			if (err) {
-				cb(err);
-			}
-			if (count >= total_count) {
-				cb(null);
-			}
-			else scrape_data(base_url+'/search/fgs?s=' + count, cb);
-		})
-}
-
