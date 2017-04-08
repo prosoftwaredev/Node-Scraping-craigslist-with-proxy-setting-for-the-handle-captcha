@@ -13,8 +13,10 @@ var request = require('request');
 var cheerio = require('cheerio');
 var async = require('async');
 var config = require('./config.js');
+var vars = require('./vars.js');
+var cert= fs.readFileSync(vars.cert_path);
 
-async.each(config, eachUrl,
+async.each(config, eachUrl, 
 	function(err) {
 		if (err) {
 			console.log(err);
@@ -25,13 +27,16 @@ async.each(config, eachUrl,
 })
 
 function eachUrl(url, callback) {
-
+	
 	const URL = url.url;
+	
 
-	var search_text = URL.substr(URL.indexOf("search/") + 7);
-
+	var proxy_url = vars.proxy_url;
+	
+	var search_text = URL.substr(URL.indexOf("search/") + 7); 
+    
 	const base_url = URL.replace('/search/', '').replace(search_text, '');
-
+	
 	const city_name = base_url.replace('https://', '').replace('.craigslist.org', '');
 
 	var total_count;
@@ -39,44 +44,44 @@ function eachUrl(url, callback) {
 	var json = [];
 	var config_json = [];
 	var download_dir_init = './download';
-
+	
 	if(!fs.existsSync(download_dir_init)){
 		fs.mkdir(download_dir_init);
 	}
 
 	var city_dir = './download' + '/' + city_name;
-
+		
 	if (!fs.existsSync(city_dir)){
 	    fs.mkdirSync(city_dir);
 	}
-
+	
 	var download_dir = './download' + '/' + city_name + '/' + search_text.replace('/', '');
-
+	
 	if (!fs.existsSync(download_dir)){
 	    fs.mkdirSync(download_dir);
 	}
-
+	
 	scrape_data(URL, function (err) {
 		if (err) {
 			console.log(err);
 			process.exit(0);
 		}
 	});
-
+	
 	function get_urls_by_page(url, next) {
-
-		var options = {
-	        url: url,
-	        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
-	        requestCert: true,
-	        rejectUnauthorized: true
-	    };
-
-	    var new_req = request.defaults({
-	        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
-	    });
-
-		new_req(options, function(error, response, html){
+		
+			var options = {
+		        url: url,
+		        ca: cert,
+		        requestCert: true,
+		        rejectUnauthorized: true
+		    };
+		
+		    var new_req = request.defaults({
+			        'proxy': proxy_url
+		    });
+		
+			new_req(options, function(error, response, html){
 			if (error || response.statusCode != 200) {
 				console.log('Error:' + error);
 				process.exit(0);
@@ -85,10 +90,10 @@ function eachUrl(url, callback) {
 			if (count == 0) {
 				total_count = $('.totalcount').eq(0).text();
 			}
-
+	
 			$('ul.rows li p a.result-title').each(function(i, elm){
 				var url = $(this).attr('href');
-
+	
 				if (url !== undefined){
 					config_json[count] = {};
 					json[count] = {};
@@ -96,30 +101,31 @@ function eachUrl(url, callback) {
 					json[count]['url'] = base_url + url;
 					count++;
 				}
-
+	
 			});
 			next(null);
 		});
 	}
-
-
+	
+	
 	function get_infor_by_page(next) {
 		var get_data = async.queue(function(task, callback) {
+			
 			var options = {
 		        url: json[task.idx]['url'],
-		        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
+		        ca: cert,
 		        requestCert: true,
 		        rejectUnauthorized: true
 		    };
-
+		
 		    var new_req = request.defaults({
-		        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
+			        'proxy': proxy_url
 		    });
-
+		
 			new_req(options, function(err, response, html) {
 				console.log("callback" + task.idx + "*******************");
 				var $ = cheerio.load(html);
-
+	
 				json[task.idx]['URL'] = URL;
 				json[task.idx]['date_of_scrape'] = new Date();
 				json[task.idx]['date_of_posting'] = $('div.postinginfos').find('.postinginfo').eq(1).find('time').attr('datetime');
@@ -130,38 +136,23 @@ function eachUrl(url, callback) {
 				json[task.idx]['data_longitude'] = $('#map').attr('data-longitude');
 				json[task.idx]['first_img_url'] = $('div.swipe-wrap div.first img').attr('src');
 	            json[task.idx]['service_type'] = $('body > section > header > nav > ul > li.crumb.category > p > a').text();
-	            json[task.idx]['area'] = $('b ody > section > header > nav > ul > li.crumb.area > p > a').text();
-
-	            if(search_text.length > 4){
-
-	            	if(city_name == "newjersey") {
-	            		var reply_url = base_url + "/reply/njy" + json[task.idx]['url'].replace(base_url, '').replace(json[task.idx]['url'].replace(base_url, '').substr('/', 4)).replace('undefined', '').replace('.html', '');
-	            	} else if (city_name == "newyork") {
-	            		var reply_url = base_url + "/reply/nyc" + json[task.idx]['url'].replace(base_url, '').replace(json[task.idx]['url'].replace(base_url, '').substr('/', 4)).replace('undefined', '').replace('.html', '');
-	            	}
-
-	            } else {
-
-	            	if(city_name == "newjersey") {
-	            		var reply_url = base_url + "/reply/njy" + json[task.idx]['url'].replace(base_url, '').replace('.html', '');
-	            	} else if (city_name == "newyork") {
-	            		var reply_url = base_url + "/reply/nyc" + json[task.idx]['url'].replace(base_url, '').replace('.html', '');
-	            	}
-
-	            }
-				console.log(reply_url);
-
+	            json[task.idx]['service_section'] = $('body > section > header > nav > ul > li.crumb.section > p > a').text();
+	            json[task.idx]['area'] = $('body > section > header > nav > ul > li.crumb.area > p > a').text();
+	            json[task.idx]['subarea'] = $('body > section > header > nav > ul > li.crumb.subarea > p > a').text();
+	            
+				var reply_url = base_url + $('body a#replylink').attr('href');
+	            
 				var options = {
 			        url: reply_url,
-			        ca: fs.readFileSync("/etc/ssl/certs/crawlera-ca.crt"),
+			        ca: cert,
 			        requestCert: true,
 			        rejectUnauthorized: true
 			    };
-
+			
 			    var new_req = request.defaults({
-				        'proxy': 'http://048d79d5bbae4fc788c350b0c64654dd:@proxy.crawlera.com:8010'
+				        'proxy': proxy_url
 			    });
-
+			
 				new_req(options, function(error,reponse, body) {
 					var $ = cheerio.load(reponse.body);
 					$('.reply-tel-number').html() == null? json[task.idx]['reply_phone_number'] = '':json[task.idx]['reply_phone_number'] = $('.reply-tel-number').html().replace('\n            &#x260E; ', '').replace('\n        ', '').replace('\next. 201',  '');
@@ -173,10 +164,10 @@ function eachUrl(url, callback) {
 					}
 					console.log('-----------------------------------------------');
 					console.log(json[task.idx]);
-
+					
 				    fs.readFile(download_dir + '/' + 'output.json', 'utf8', function readFileCallback(err, data){
 					    if (err){
-
+					    	
 					    	var Json = [];
 					    	Json.push(json[task.idx]);
 					        fs.writeFile(download_dir + '/' + 'output.json', JSON.stringify(Json, null, 4), function(err){
@@ -193,7 +184,7 @@ function eachUrl(url, callback) {
 						    obj.push(json[task.idx]);
 						    // console.log(json[task.idx]);
 						    // return false; //add some data
-
+						    
 						    fs.writeFile(download_dir + '/' + 'output.json', JSON.stringify(obj, null, 4), 'utf8', function(err, data) {
 						    	if (err) {
 
@@ -201,22 +192,22 @@ function eachUrl(url, callback) {
 						    	else {
 						    		console.log(data)
 						    	}
-						    }); // write it back
+						    }); // write it back 
 						}
 					});
 
 					callback();
-
+					  	
 				});
-
+					
 			})
-
+	
 		});
-
+	
 		var delta;
-
+	
 		count % 120 == 0 ? delta = 120: delta = count % 120;
-
+		
 		for (var idx = count - delta; idx < count; idx ++) {
 			get_data.push({idx: idx}, function(err) {
 				console.log("count " + count);
@@ -226,9 +217,9 @@ function eachUrl(url, callback) {
 			next();
 		}
 	}
-
+	
 	function scrape_data(url, cb){
-
+	
 		async.waterfall([
 			function(next) {
 				next(null, url);
@@ -246,3 +237,5 @@ function eachUrl(url, callback) {
 			})
 	}
 }
+
+
