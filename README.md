@@ -1,2 +1,7 @@
 # Node-Scraping-with-proxy-setting-for-the-handle-captcha
-This is the node scraping project.
+
+Node js scraping craigslist app
+
+Handle captcha with crawlera API for proxy and use cheerio scraping framework.
+
+
